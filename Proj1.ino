@@ -3,6 +3,7 @@
 #include <DHT.h>
 #include <Wire.h>
 #include <Adafruit_INA219.h>
+#include <EEPROM.h>
 #include "site.hpp"
 #include "calibrate.hpp"
 
@@ -52,12 +53,14 @@ void handleCalibratePage() {
 
 void handleSetDry() {
   RAW_DRY = analogRead(CALIBRATION_PIN);
+  saveCalibration(); // <--
   server.sendHeader("Location", "/calibrate", true);
   server.send(302, "text/plain", "");
 }
 
 void handleSetWet() {
   RAW_WET = analogRead(CALIBRATION_PIN);
+  saveCalibration(); // <--
   server.sendHeader("Location", "/calibrate", true);
   server.send(302, "text/plain", "");
 }
@@ -97,9 +100,23 @@ void handleData() {
   server.send(200, "application/json", json);
 }
 
+void saveCalibration() {
+  EEPROM.writeInt(0, RAW_DRY);
+  EEPROM.writeInt(4, RAW_WET);
+  EEPROM.commit();
+}
+
+void loadCalibration() {
+  RAW_DRY = EEPROM.readInt(0);
+  RAW_WET = EEPROM.readInt(4);
+}
+
+
 // --- Setup ---
 void setup() {
   Serial.begin(115200);
+  EEPROM.begin(8); // мінімум 8 байтів для двох int
+  loadCalibration();
   dht.begin();
 
   if (!ina219.begin()) {
