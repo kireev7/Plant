@@ -1,37 +1,10 @@
-/*
-#define TDS_PIN A11
-#define VREF 3.3 // Напруга опорного живлення ESP32
-
-void setup() {
-  Serial.begin(115200);
-}
-
-void loop() {
-  int analogValue = analogRead(TDS_PIN);
-  float voltage = analogValue * (VREF / 4095.0);
-
-  // Розрахунок TDS
-  float tdsValue = (133.42 * pow(voltage, 3) - 
-                    255.86 * pow(voltage, 2) + 
-                    857.39 * voltage) * 0.5;
-
-  Serial.print("🔬 Напруга: ");
-  Serial.print(voltage, 2);
-  Serial.print(" V\t💧 TDS: ");
-  Serial.print(tdsValue, 2);
-  Serial.println(" ppm");
-
-  delay(1000);
-}
-*/
-
-
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DHT.h>
 #include <Wire.h>
 #include <Adafruit_INA219.h>
-#include "site.hpp"  // HTML-сторінка
+#include "site.hpp"
+#include "calibrate.hpp"
 
 // --- Піни ---
 #define DHTPIN 4
@@ -40,6 +13,7 @@ void loop() {
 #define GROUND0_PIN 35
 #define GROUND1_PIN 32
 #define GROUND2_PIN 33
+#define CALIBRATION_PIN 33 // <- Калібрування через 33-й пін
 
 #define RELAY_PIN 25
 
@@ -63,49 +37,73 @@ int soil0 = 0;
 int soil1 = 0;
 int soil2 = 0;
 
-// --- Обробник HTML ---
+int RAW_DRY = 0;
+int RAW_WET = 0;
+
+// --- Калібрування ---
+void handleCalibratePage() {
+  int rawValue = analogRead(CALIBRATION_PIN);
+  String html = calibratePageHtml;
+  html.replace("%RAW%", String(rawValue));
+  html.replace("%DRY%", String(RAW_DRY));
+  html.replace("%WET%", String(RAW_WET));
+  server.send(200, "text/html", html);
+}
+
+void handleSetDry() {
+  RAW_DRY = analogRead(CALIBRATION_PIN);
+  server.sendHeader("Location", "/calibrate", true);
+  server.send(302, "text/plain", "");
+}
+
+void handleSetWet() {
+  RAW_WET = analogRead(CALIBRATION_PIN);
+  server.sendHeader("Location", "/calibrate", true);
+  server.send(302, "text/plain", "");
+}
+
+// --- Інші обробники ---
 void handleRoot() {
   server.send(200, "text/html", htmlPage);
 }
 
-// --- Обробник JSON ---
 void handleData() {
   humidity = dht.readHumidity();
   temperature = dht.readTemperature();
-  soil0 = map(analogRead(GROUND0_PIN), 0, 4095, 100, 0);
-  soil1 = map(analogRead(GROUND1_PIN), 0, 4095, 100, 0);
-  soil2 = map(analogRead(GROUND2_PIN), 0, 4095, 100, 0);
+
+  int raw0 = analogRead(GROUND0_PIN);
+  int raw1 = analogRead(GROUND1_PIN);
+  int raw2 = analogRead(GROUND2_PIN);
+
+  soil0 = constrain(map(raw0, RAW_DRY, RAW_WET, 0, 100), 0, 100);
+  soil1 = constrain(map(raw1, RAW_DRY, RAW_WET, 0, 100), 0, 100);
+  soil2 = constrain(map(raw2, RAW_DRY, RAW_WET, 0, 100), 0, 100);
+
   current_mA = ina219.getCurrent_mA();
   noWater = current_mA < 165;
   relayState = digitalRead(RELAY_PIN);
 
-  String json;
-
-  if (isnan(temperature) || isnan(humidity)) {
-    json = "{\"error\": \"Failed to read from DHT22\"}";
-  } else {
-    json = "{";
-    json += "\"temp\":" + String(temperature, 1) + ",";
-    json += "\"hum\":" + String(humidity, 1) + ",";
-    json += "\"ground0\":" + String(soil0) + ",";
-    json += "\"ground1\":" + String(soil1) + ",";
-    json += "\"ground2\":" + String(soil2) + ",";
-    json += "\"relay\":" + String(relayState) + ",";
-    json += "\"current\":" + String(current_mA, 1) + ",";
-    json += "\"noWater\":" + String(noWater ? "true" : "false");
-    json += "}";
-  }
+  String json = "{";
+  json += "\"temp\":" + String(temperature, 1) + ",";
+  json += "\"hum\":" + String(humidity, 1) + ",";
+  json += "\"ground0\":" + String(soil0) + ",";
+  json += "\"ground1\":" + String(soil1) + ",";
+  json += "\"ground2\":" + String(soil2) + ",";
+  json += "\"relay\":" + String(relayState) + ",";
+  json += "\"current\":" + String(current_mA, 1) + ",";
+  json += "\"noWater\":" + String(noWater ? "true" : "false");
+  json += "}";
 
   server.send(200, "application/json", json);
 }
 
-// --- Налаштування ---
+// --- Setup ---
 void setup() {
   Serial.begin(115200);
   dht.begin();
 
   if (!ina219.begin()) {
-    Serial.println("❌ Помилка INA219. Перевір з'єднання!");
+    Serial.println("❌ INA219 не знайдено!");
     while (1);
   }
   ina219.setCalibration_32V_2A();
@@ -114,50 +112,39 @@ void setup() {
   digitalWrite(RELAY_PIN, LOW);
 
   WiFi.begin(ssid, password);
-  Serial.print("🌐 Підключення до Wi-Fi");
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-    delay(500);
-    Serial.print(".");
-    attempts++;
+  Serial.print("Підключення до Wi-Fi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500); Serial.print(".");
   }
+  Serial.println("\n✅ Wi-Fi OK");
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n✅ Wi-Fi підключено");
-    Serial.print("📶 IP: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("\n❌ Wi-Fi не підключено. Продовження в офлайн режимі...");
-  }
-
+  // Роутинг
   server.on("/", handleRoot);
   server.on("/data", handleData);
+  server.on("/calibrate", handleCalibratePage);
+  server.on("/setDry", HTTP_POST, handleSetDry);
+  server.on("/setWet", HTTP_POST, handleSetWet);
   server.begin();
-  Serial.println("✅ Вебсервер запущено");
+  Serial.println("Вебсервер запущено");
 }
 
-// --- Основний цикл ---
+// --- Loop ---
 void loop() {
   server.handleClient();
 
-  soil0 = map(analogRead(GROUND0_PIN), 0, 4095, 100, 0);
-  soil1 = map(analogRead(GROUND1_PIN), 0, 4095, 100, 0);
-  soil2 = map(analogRead(GROUND2_PIN), 0, 4095, 100, 0);
+  int raw0 = analogRead(GROUND0_PIN);
+  int raw1 = analogRead(GROUND1_PIN);
+  int raw2 = analogRead(GROUND2_PIN);
+
+  soil0 = constrain(map(raw0, RAW_DRY, RAW_WET, 0, 100), 0, 100);
+  soil1 = constrain(map(raw1, RAW_DRY, RAW_WET, 0, 100), 0, 100);
+  soil2 = constrain(map(raw2, RAW_DRY, RAW_WET, 0, 100), 0, 100);
 
   current_mA = ina219.getCurrent_mA();
   humidity = dht.readHumidity();
   temperature = dht.readTemperature();
   noWater = current_mA < 165;
 
-  // Вивід в Serial
-  Serial.print("🌡 Темп: "); Serial.print(temperature); Serial.print("°C | ");
-  Serial.print("💧 Вологість: "); Serial.print(humidity); Serial.print("% | ");
-  Serial.print("🌱 Ґрунт0: "); Serial.print(soil0); Serial.print("% | ");
-  Serial.print("Ґрунт1: "); Serial.print(soil1); Serial.print("% | ");
-  Serial.print("Ґрунт2: "); Serial.print(soil2); Serial.print("% | ");
-  Serial.print("⚡️ Струм: "); Serial.print(current_mA); Serial.print(" мА | ");
-
-  // Автоматичне керування реле
   if (soil0 < 60 || soil1 < 60 || soil2 < 60) {
     digitalWrite(RELAY_PIN, HIGH);
     relayState = HIGH;
@@ -166,14 +153,19 @@ void loop() {
     relayState = LOW;
   }
 
-  // Статус води
-  if (relayState == HIGH && current_mA < 165) {
-    Serial.print("💧 Вода: Закінчилась");
-  } else if (relayState == LOW) {
-    Serial.print("💧 Реле вимкнено");
-  } else {
+  Serial.print("🌡 "); Serial.print(temperature); Serial.print("°C | ");
+  Serial.print("💧 "); Serial.print(humidity); Serial.print("% | ");
+  Serial.print("Ґрунт0: "); Serial.print(soil0); Serial.print("% | ");
+  Serial.print("Ґрунт1: "); Serial.print(soil1); Serial.print("% | ");
+  Serial.print("Ґрунт2: "); Serial.print(soil2); Serial.print("% | ");
+  Serial.print("⚡ "); Serial.print(current_mA); Serial.print(" мА | ");
+
+  if (relayState == HIGH && current_mA < 165)
+    Serial.print("💧 Вода: Немає");
+  else if (relayState == LOW)
+    Serial.print("💧 Реле вимкнене");
+  else
     Serial.print("💧 Вода: OK");
-  }
 
   Serial.println();
   delay(2000);

@@ -1,44 +1,25 @@
-#pragma once
-
-const char* calibratePageHtmlTemplate = R"rawliteral(
+const char* calibratePageHtml = R"rawliteral(
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Калібрування ґрунтового сенсора</title>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: Arial; text-align: center; margin-top: 50px; }
-    button {
-      padding: 15px 30px;
-      margin: 10px;
-      font-size: 18px;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 8px;
-    }
-    p {
-      font-size: 20px;
-    }
-    a {
-      display: inline-block;
-      margin-top: 20px;
-      color: #333;
-      text-decoration: none;
-    }
-  </style>
-</head>
-<body>
-  <h2>Калібрування ґрунтового сенсора</h2>
-  <p>Поточне сире значення: <b>%RAW%</b></p>
-  <form action='/setDry' method='POST'>
-    <button type='submit'>🌵 Встановити як Сухий ґрунт</button>
-  </form>
-  <form action='/setWet' method='POST'>
-    <button type='submit'>💧 Встановити як Вологий ґрунт</button>
-  </form>
-  <p><b>RAW_DRY = %DRY%</b><br><b>RAW_WET = %WET%</b></p>
-  <a href="/">⬅ Назад</a>
-</body>
+  <head>
+    <meta charset="UTF-8">
+    <title>Калібрування ґрунтового датчика</title>
+    <style>
+      body { font-family: sans-serif; text-align: center; padding: 20px; }
+      button { font-size: 1.2em; padding: 10px 20px; margin: 10px; }
+    </style>
+  </head>
+  <body>
+    <h2>Калібрування вологості ґрунту</h2>
+    <p>Поточне значення з піну 33: <strong>%RAW%</strong></p>
+    <p>Сухе значення (RAW_DRY): <strong>%DRY%</strong></p>
+    <p>Вологе значення (RAW_WET): <strong>%WET%</strong></p>
+    <form method="POST" action="/setDry">
+      <button>Це повністю сухо</button>
+    </form>
+    <form method="POST" action="/setWet">
+      <button>Це занурено у воду</button>
+    </form>
+  </body>
 </html>
 )rawliteral";
