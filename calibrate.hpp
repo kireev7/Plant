@@ -7,6 +7,16 @@ const char* calibratePageHtml = R"rawliteral(
     <style>
       body { font-family: sans-serif; text-align: center; padding: 20px; }
       button { font-size: 1.2em; padding: 10px 20px; margin: 10px; }
+      a.button {
+        display: inline-block;
+        padding: 10px 20px;
+        margin: 10px;
+        font-size: 1.2em;
+        text-decoration: none;
+        color: white;
+        background-color: #007BFF;
+        border-radius: 5px;
+      }
     </style>
   </head>
   <body>
@@ -20,6 +30,7 @@ const char* calibratePageHtml = R"rawliteral(
     <form method="POST" action="/setWet">
       <button>Це занурено у воду</button>
     </form>
+    <a href="/" class="button">⬅ Назад</a>
   </body>
 </html>
 )rawliteral";
