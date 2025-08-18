@@ -16,6 +16,8 @@
 #define GROUND2_PIN 33
 #define CALIBRATION_PIN 33 // <- Калібрування через 33-й пін
 
+#define TDS_PIN 34
+
 #define RELAY_PIN 25
 
 // --- Wi-Fi ---
@@ -30,8 +32,13 @@ WebServer server(80);
 // --- Змінні ---
 float temperature = 0.0;
 float humidity = 0.0;
+
 float current_mA = 0.0;
+
 bool noWater = false;
+
+float tdsValue = 0.0;
+
 int relayState = 0;
 
 int soil0 = 0;
@@ -156,11 +163,15 @@ void loop() {
   soil0 = constrain(map(raw0, RAW_DRY, RAW_WET, 0, 100), 0, 100);
   soil1 = constrain(map(raw1, RAW_DRY, RAW_WET, 0, 100), 0, 100);
   soil2 = constrain(map(raw2, RAW_DRY, RAW_WET, 0, 100), 0, 100);
+  
+  float tdsVoltage = analogRead(TDS_PIN) * (3.3 / 4095.0);
+  tdsValue = (133.42 * pow(tdsVoltage, 3) - 255.86 * pow(tdsVoltage, 2) + 857.39 * tdsVoltage) * 0.5;
 
   current_mA = ina219.getCurrent_mA();
   humidity = dht.readHumidity();
   temperature = dht.readTemperature();
   noWater = current_mA < 165;
+
 
   if (soil0 < 60 || soil1 < 60 || soil2 < 60) {
     digitalWrite(RELAY_PIN, HIGH);
@@ -176,6 +187,7 @@ void loop() {
   Serial.print("Ґрунт1: "); Serial.print(soil1); Serial.print("% | ");
   Serial.print("Ґрунт2: "); Serial.print(soil2); Serial.print("% | ");
   Serial.print("⚡ "); Serial.print(current_mA); Serial.print(" мА | ");
+  Serial.print("TDS: " + String(tdsValue) + " ppm | ");
 
   if (relayState == HIGH && current_mA < 165)
     Serial.print("💧 Вода: Немає");
