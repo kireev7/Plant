@@ -101,7 +101,8 @@ void handleData() {
   json += "\"ground2\":" + String(soil2) + ",";
   json += "\"relay\":" + String(relayState) + ",";
   json += "\"current\":" + String(current_mA, 1) + ",";
-  json += "\"noWater\":" + String(noWater ? "true" : "false");
+  json += "\"noWater\":" + String(noWater ? "true" : "false") + ",";
+  json += "\"tds\":" + String(tdsValue, 1);
   json += "}";
 
   server.send(200, "application/json", json);
