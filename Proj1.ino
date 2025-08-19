@@ -4,10 +4,9 @@
 #include <Wire.h>
 #include <Adafruit_INA219.h>
 #include <EEPROM.h>
-
 #include "site.hpp"
 #include "calibrate.hpp"
-#include "wifi.hpp"
+#include "wifi_scan.hpp"
 
 // --- Піни ---
 #define DHTPIN 4
@@ -110,7 +109,11 @@ void handleSetWet() {
 
 // --- Обробка Wi-Fi налаштувань ---
 void handleWiFiPage() {
-  server.send(200, "text/html", wifiPageHtml);
+  std::vector<String> networks = scanWifiNetworks();
+  String html = wifiScanPageHtml;
+  String options = generateSelectOptions(networks);
+  html.replace("%SELECT_OPTIONS%", options);
+  server.send(200, "text/html", html);
 }
 
 void handleSetWiFi() {
@@ -118,17 +121,17 @@ void handleSetWiFi() {
     strncpy(stored_ssid, server.arg("ssid").c_str(), 32);
     strncpy(stored_password, server.arg("password").c_str(), 64);
     saveWiFiCredentials();
-    server.send(200, "text/html", "<h1>Wi-Fi data is saved. Rebooting...</h1>");
+    server.send(200, "text/html", "<h1>Wi-Fi data saved. Rebooting...</h1>");
     delay(1000);
     ESP.restart(); // Перезавантаження для підключення до нової мережі
   } else {
-    server.send(400, "text/html", "<h1>Помилка: Введіть SSID</h1>");
+    server.send(400, "text/html", "<h1>Error: Select wi-fi</h1>");
   }
 }
 
 void handleResetWiFi() {
   clearWiFiCredentials();
-  server.send(200, "text/html", "<h1>Wi-Fi is reset... Reboot</h1>");
+  server.send(200, "text/html", "<h1>Wi-Fi data reset. Rebooting...</h1>");
   delay(1000);
   ESP.restart(); // Перезавантаження для повернення до точки доступу
 }
