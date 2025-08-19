@@ -57,6 +57,7 @@ const char htmlPage[] PROGMEM = R"rawliteral(
         <div class="row"><span>💧 Вологість повітря:</span> <span id="hum">--</span> %</div>
         <div class="row"><span>🚰 Реле:</span> <span id="relay">--</span></div>
         <div class="row"><span>⚡ Струм:</span> <span id="current">--</span> мА</div>
+        <div id="waterQuality" class="row"></div>
         <div id="waterStatus">💧 Статус води: --</div>
       </div>
 
@@ -84,7 +85,7 @@ const char htmlPage[] PROGMEM = R"rawliteral(
         </div>
       </div>
 
-      <!-- Кнопка переходу до калібрування -->
+      <!-- Кнопки -->
       <div style="margin-top: 30px;">
         <a href="/calibrate" style="
           display: inline-block;
@@ -94,14 +95,25 @@ const char htmlPage[] PROGMEM = R"rawliteral(
           text-decoration: none;
           border-radius: 8px;
           font-size: 16px;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+          box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+          margin-right: 10px;">
           ⚙️ Калібрування сенсорів
+        </a>
+        <a href="/wifi" style="
+          display: inline-block;
+          padding: 10px 20px;
+          background-color: #4CAF50;
+          color: white;
+          text-decoration: none;
+          border-radius: 8px;
+          font-size: 16px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+          📡 Налаштування Wi-Fi
         </a>
       </div>
     </div>
 
     <script>
-      // --- Обробка перейменування ---
       function setupEditableNames() {
         for (let i = 0; i < 3; i++) {
           const el = document.getElementById('plantName' + i);
@@ -118,7 +130,6 @@ const char htmlPage[] PROGMEM = R"rawliteral(
         }
       }
 
-      // --- Дані від ESP ---
       function updateData() {
         fetch("/data")
           .then(res => res.json())
@@ -133,7 +144,7 @@ const char htmlPage[] PROGMEM = R"rawliteral(
             document.getElementById("relay").textContent = relayText;
 
             if ("current" in data) {
-              document.getElementById("current").textContent = data.current + " мА";
+              document.getElementById("current").textContent = data.current;
             }
 
             const waterStatus = document.getElementById("waterStatus");
@@ -144,6 +155,20 @@ const char htmlPage[] PROGMEM = R"rawliteral(
               waterStatus.textContent = "💧 Вода в нормі";
               waterStatus.style.color = "green";
             }
+
+            // TDS Quality
+            const tds = data.tds;
+            let qualityText = "";
+            if (tds <= 5){
+              qualityText = "❗️ Занурьте трубку у воду";
+            } else if (tds <= 50) {
+              qualityText = "💧 Вода дуже чиста";
+            } else if (tds <= 100) {
+              qualityText = "⚠️ Вода нормальна";
+            } else {
+              qualityText = "❌ Погана вода";
+            } 
+            document.getElementById("waterQuality").innerText = qualityText;
           });
       }
 
