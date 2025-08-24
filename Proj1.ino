@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include <Adafruit_INA219.h>
 #include <EEPROM.h>
+
 #include "site.hpp"
 #include "calibrate.hpp"
 #include "wifi_scan.hpp"
@@ -205,6 +206,19 @@ void setup() {
   if (stored_ssid[0] != '\0') {
     Serial.print("Спроба підключення до Wi-Fi: ");
     Serial.println(stored_ssid);
+
+    // Налаштування статичної IP-адреси
+    IPAddress local_IP(192, 168, 0, 104); // Фіксована IP-адреса
+    IPAddress gateway(192, 168, 0, 1);    // Шлюз (зазвичай IP роутера)
+    IPAddress subnet(255, 255, 255, 0);   // Маска підмережі
+    IPAddress primaryDNS(8, 8, 8, 8);     // DNS (наприклад, Google DNS)
+    IPAddress secondaryDNS(8, 8, 4, 4);   // Додатковий DNS
+
+    // Налаштування статичної IP
+    if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
+      Serial.println("❌ Не вдалося налаштувати статичну IP");
+    }
+
     WiFi.begin(stored_ssid, stored_password);
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 20) {
@@ -224,7 +238,7 @@ void setup() {
 
   // Якщо підключення до Wi-Fi не вдалося, створюємо точку доступу
   if (!wifiConnected) {
-    WiFi.softAPConfig(IPAddress(192,168,1,1), IPAddress(192,168,1,1), IPAddress(255,255,255,0));
+    WiFi.softAPConfig(IPAddress(192, 168, 0, 1), IPAddress(192, 168, 0, 1), IPAddress(255, 255, 255, 0));
     WiFi.softAP(ap_ssid); // Точка доступу без пароля
     Serial.println("Точка доступу створена");
     Serial.print("IP-адреса: ");
